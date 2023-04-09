@@ -141,13 +141,11 @@ def 文件處理(data):
 
 def 目標項目文件輸出(data, 目標項目):
     if 選項 == 0:
-        輸出工作表 = 'DIP'
+        輸出工作表 = '輸出結果-DIP.xls'
     elif 選項 == 1:
-        輸出工作表 = 'SMT'
-    writer = pd.ExcelWriter('output.xlsx', engine='xlsxwriter')
+        輸出工作表 = '輸出結果-SMT.xls'
     data = data.query(f'index == {list(目標項目)}')
-    data.to_excel(writer, index=False, sheet_name=輸出工作表)
-    writer.save()
+    data.to_excel(f'{輸出工作表}', index=False)
 
     # if 選項 == 0:
     #     輸出檔名 = '輸出結果-DIP.xls'
