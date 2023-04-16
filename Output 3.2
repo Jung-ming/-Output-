@@ -1,0 +1,308 @@
+# from 函式放置區 import *
+import os
+import sys
+
+BASE_DIR = os.path.abspath('C:/Users/m3x06/anaconda3/Lib/site-packages')
+sys.path.append(BASE_DIR)
+
+import datetime
+import pandas as pd
+import pandas.io.formats.excel
+
+
+def 閏年判斷():
+    x = datetime.datetime.now()
+    x = x.date().year
+    if x % 4 == 0 and x % 100 != 0:
+        x = '閏年'
+        return x
+    elif x % 400 == 0:
+        x = '閏年'
+        return x
+    else:
+        x = '不是閏年'
+        return x
+
+
+def 日期抓取():
+    global 抓取日期
+    大月份 = [1, 3, 5, 7, 8, 10, 12]  # 1月31天
+    小月份 = [4, 6, 9, 11]  # 1月30天
+    # 特殊月份 2月 須注意潤年
+
+    月份 = input('請輸入月份:')
+    日期 = input('請輸入日期:')
+    總天數 = int(input('請輸入總天數:'))
+    抓取日期 = []
+
+    for i in range(總天數):
+        合成日期 = 月份 + '/' + 日期
+        抓取日期.append(合成日期)
+        if int(月份) in 大月份 and int(日期) == 31:
+            月份 = str(int(月份) + 1)
+            日期 = '1'
+        # 第二個不能用if 因為會變成再判斷一次，若不符合又會進入到else，
+        # 但第一個 if 若符合後就不該再進入 else 了
+        elif int(月份) in 小月份 and int(日期) == 30:
+            月份 = str(int(月份) + 1)
+            日期 = '1'
+        elif int(月份) == 2:
+            閏年判斷結果 = 閏年判斷()
+            if 閏年判斷結果 == '閏年' and int(日期) == 29:
+                月份 = str(int(月份) + 1)
+                日期 = '1'
+            elif 閏年判斷結果 == '不是閏年' and int(日期) == 28:
+                月份 = str(int(月份) + 1)
+                日期 = '1'
+            else:
+                日期 = str(int(日期) + 1)
+        else:
+            日期 = str(int(日期) + 1)
+    print(抓取日期)
+    return 抓取日期
+
+
+def 抓取目標項目(data, 抓取日期):
+    目標項目 = set()
+    for index, value in enumerate(data['OUTPUT']):
+        for 日期 in 抓取日期:
+            if 日期 in value:
+                目標項目.add(index)
+    for index, value in enumerate(data['DIP首件產出時間/數量']):
+        for 日期 in 抓取日期:
+            if 日期 in value:
+                目標項目.add(index)
+    return 目標項目
+
+
+def 文件讀取():
+    file_name = input('請複製文件名並貼上:')
+    # dtype={'開始時間':str} 可以用來設定讀取時的資料型態
+    # 避免自動出不想要的結果 (目前不用這麼做了，先刪掉)
+    data = pd.read_excel(f'C:/Users/m3x06/PycharmProjects/公司文件處理/公司Output文件/{file_name}'
+                         , header=1, sheet_name=['DIP', 'SMT'])
+    data_DIP = data['DIP']
+    data_SMT = data['SMT']
+
+    return data_DIP, data_SMT
+
+
+def 文件處理(data):
+    # 只留批號1
+    # data = data[data['批號'] == 1]
+
+    # 丟掉AP和AQ皆為空值的列
+    # 先丟AP為空
+    data = data[pd.isnull(data['DIP首件產出時間/數量']) == False]
+    # 再丟AQ為空
+    data = data[pd.isnull(data['OUTPUT']) == False]
+
+    # 去除重複值
+    data = data.drop_duplicates(subset=['母工單單號', '名稱規格'])
+    # 重置索引，不重置的話，會不方便依照索引去抓取想要的項目
+    data = data.reset_index(drop=True)
+    return data
+
+
+def 目標項目與資料比對(data, 目標項目):
+    if type(data) is list:
+        for index, value in enumerate(data):
+            if index == 0:
+                data_DIP = value.query(f'index == {list(目標項目[index])}')
+            else:
+                data_SMT = value.query(f'index == {list(目標項目[index])}')
+                # data_SMT.to_excel('輸出結果-SMT.xls', index=False)
+    else:
+        data = data.query(f'index == {list(目標項目)}')
+        data.to_excel('輸出結果.xls', index=False)
+
+    return data_DIP, data_SMT
+
+
+def 抓取Output足標(data, 抓取日期):
+    目標項目 = set()
+    for 足標, value in enumerate(data['OUTPUT']):
+        if 抓取日期 in value:
+            目標項目.add(足標)
+    return 目標項目
+
+
+def 抓取DIP首件足標(data, 抓取日期):
+    目標項目 = set()
+    for 足標, value in enumerate(data['DIP首件產出時間/數量']):
+        if 抓取日期 in value:
+            目標項目.add(足標)
+    return 目標項目
+
+
+def 排序資料(data):
+    # 將'TEST'和'成品'皆為X的部分排序到最前面
+    重置足標 = []
+    for index, row in data.iterrows():
+        if row['TEST'] == 'X' and row['成品'] == 'X':
+            重置足標.insert(0, index)
+        else:
+            重置足標.append(index)
+
+    data = data.reindex(重置足標)
+
+    return data
+
+
+def 格式更改(抓取日期, data):
+    # 创建一个 ExcelWriter 对象，并将数据框写入 Excel 文件
+    # 改變日期讀取有2種寫法
+    # datetime_format='mm/dd yyyy
+    # date_format='mmmm dd yyyy'
+    # 使用上取決於資料本身的狀況，如果資料包含時間 則用datetime_format
+    # 如果只有年月日則使用date_format
+
+    # 獲取當天日期，並將其轉換成文字
+    # 當天日期_文字格式 = 當天日期_日期格式.strftime('%#m/%#d')
+    當天日期_日期格式 = datetime.date.today()
+    當天日期_文字格式 = 當天日期_日期格式.strftime('%m%d')
+    輸出檔名 = 'Output輸出檔' + 當天日期_文字格式 + '.xlsx'
+    writer = pd.ExcelWriter(f'{輸出檔名}', engine='xlsxwriter', datetime_format='mm/dd hh:mm')
+
+    # 一些設定
+    列寬_10 = [0, 1, 9]
+    列寬_5 = [43, 44, 46]
+    隱藏行 = ['D', 'F', 'H', 'I', 'L', 'O', 'Q', 'R', 'S',
+           'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'AA', 'AB',
+           'AC', 'AD', 'AE', 'AF', 'AG', 'AH', 'AI', 'AJ',
+           'AM', 'AN', 'AO']
+
+    # 設置底色
+    # 假日用-淺藍 #b7dee8 、 當日用-淺綠 #92d050 、 明天用-黃色 #ffff00
+    # 此部分注意!!! 原本僅用底色格式時，會造成換行格式消失，也就是單元格內若有多行資料就會全部變成一行
+    # 因此加入'text_wrap': True處理
+    # 經過ChatGPT說明，會有此現象是因為，套用格式時導致換行字元\n被忽略
+    # 加入'text_wrap': True確實是一個解法
+    淺綠格式 = writer.book.add_format({'bg_color': '#92d050', 'valign': 'vcenter', 'font_size': 10, 'text_wrap': True})
+    淺藍格式 = writer.book.add_format({'bg_color': '#b7dee8', 'valign': 'vcenter', 'font_size': 10, 'text_wrap': True})
+    黃色格式 = writer.book.add_format({'bg_color': '#ffff00', 'valign': 'vcenter', 'font_size': 10, 'text_wrap': True})
+
+    # 若要設置標題格式，則需要先用下方程式碼消除標題單元格格式
+    pandas.io.formats.excel.ExcelFormatter.header_style = None
+    # 設置格式
+    # 字體 'font-family': 'Times New Roman'
+    # 大小 'font-size': '12pt'
+    # 'text-align': 'center'
+    # 'vertical-align': 'middle'
+
+    # 將DataFrame寫入Excel
+    工作表名稱 = ['DIP', 'SMT']
+    for index, 工作表 in enumerate(data):
+        # 因為標題行不算，所以要加1
+        總筆數 = len(工作表.index) + 1
+
+        工作表.to_excel(writer, index=False, sheet_name=工作表名稱[index])
+
+        # 獲取工作表
+        worksheet = writer.sheets[工作表名稱[index]]
+        # 用for迴圈跑過所有Output
+        # data.iloc[行數-1, 42] 貌似會直接跳過標題行，從內容的第一格開始，並且足標為0
+        # 這邊所抓的足標是從內容的第一行開始，並且足標為0，所以不需要像前面-1，而是一開始的行設定要+1
+
+        # 就目前的邏輯來看，最後一個日期依定會是要填入黃色的日期，故使用list的pop()函數
+        黃底日期 = 抓取日期[len(抓取日期) - 1]
+        足標串列 = 抓取Output足標(工作表, 黃底日期)
+        for 足標 in 足標串列:
+            worksheet.write(足標 + 1, 42, 工作表.iloc[足標, 42], 黃色格式)
+        足標串列 = 抓取DIP首件足標(工作表, 黃底日期)
+        for 足標 in 足標串列:
+            worksheet.write(足標 + 1, 41, 工作表.iloc[足標, 41], 黃色格式)
+
+        for index, value in enumerate(抓取日期):
+            if value == '7/13':
+                足標串列 = 抓取Output足標(工作表, value)
+                for 足標 in 足標串列:
+                    worksheet.write(足標 + 1, 42, 工作表.iloc[足標, 42], 淺綠格式)
+                足標串列 = 抓取DIP首件足標(工作表, value)
+                for 足標 in 足標串列:
+                    worksheet.write(足標 + 1, 41, 工作表.iloc[足標, 41], 淺綠格式)
+
+        for 剩餘日期 in 抓取日期:
+            # '6/2' 到正式版要修改成當天日期_文字格式
+            if 剩餘日期 != 黃底日期 and 剩餘日期 != '7/13':
+                足標串列 = 抓取Output足標(工作表, 剩餘日期)
+                for 足標 in 足標串列:
+                    worksheet.write(足標 + 1, 42, 工作表.iloc[足標, 42], 淺藍格式)
+                足標串列 = 抓取DIP首件足標(工作表, 剩餘日期)
+                for 足標 in 足標串列:
+                    worksheet.write(足標 + 1, 41, 工作表.iloc[足標, 41], 淺藍格式)
+
+        # .set_column(0, 0, 10) 用來設置列寬，3個參數分別為，起始列、結束列和列寬
+        for 列 in 列寬_10:
+            worksheet.set_column(列, 列, 12)
+        for 列 in 列寬_5:
+            worksheet.set_column(列, 列, 5)
+        # DIP首件設置16
+        worksheet.set_column(41, 41, 16)
+        # Output設置30
+        worksheet.set_column(42, 42, 30)
+        # 生管備註設置9 因為日期問題 暫時設置
+        worksheet.set_column(45, 45, 10)
+        # 批號
+        worksheet.set_column(2, 2, 2)
+        # 出足數
+        worksheet.set_column(15, 15, 2)
+        # 工令量、排產量
+        worksheet.set_column(10, 10, 4)
+        worksheet.set_column(12, 12, 4)
+
+        # 開始時間、結束時間
+        worksheet.set_column(36, 36, 10)
+        worksheet.set_column(37, 37, 10)
+
+        # 名稱規格
+        worksheet.set_column(4, 4, 25)
+
+        # 隱藏設置
+        for 隱藏 in 隱藏行:
+            worksheet.set_column(f'{隱藏}:{隱藏}', None, None, {'hidden': True})
+
+        標題行格式 = writer.book.add_format({'align': 'center',
+                                        'font_size': 10,
+                                        'valign': 'vcenter',
+                                        'text_wrap': True})
+
+        一般行格式 = writer.book.add_format({
+            'font_size': 10,
+            'valign': 'vcenter',
+            'text_wrap': True})
+
+        for 行數 in range(總筆數):
+            if 行數 != 0:
+                worksheet.set_row(行數, 40, 一般行格式)
+            else:
+                worksheet.set_row(行數, 56, 標題行格式)
+
+    writer.save()
+
+
+''' 以下為主流程 '''
+
+# 讀取文件，並分成DIP和SMT
+data_DIP, data_SMT = 文件讀取()
+
+# 分別對文件進行處理，包括刪除不必要的資料和重複值等
+data_DIP = 文件處理(data_DIP)
+data_SMT = 文件處理(data_SMT)
+
+# 讓使用者指定抓取的日期區間
+抓取日期 = 日期抓取()
+
+# 根據使用者指定的日期去抓取文件中的目標足標
+DIP目標項目 = 抓取目標項目(data_DIP, 抓取日期)
+SMT目標項目 = 抓取目標項目(data_SMT, 抓取日期)
+
+# 根據目標項目，抓取處理好的文件內的目標，並輸出Excel(名字是
+# 注意data與目標項目必須兩兩相對，比如給data_DIP，那目標項就必須是DIP目標項目
+data_DIP, data_SMT = 目標項目與資料比對(data=[data_DIP, data_SMT], 目標項目=[DIP目標項目, SMT目標項目])
+# 目標項目文件輸出(data=data_DIP, 目標項目=DIP目標項目)
+
+data_DIP = 排序資料(data_DIP)
+data_SMT = 排序資料(data_SMT)
+
+格式更改(抓取日期, data=[data_DIP, data_SMT])
