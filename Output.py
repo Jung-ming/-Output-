@@ -7,6 +7,7 @@ sys.path.append(BASE_DIR)
 
 import datetime
 import pandas as pd
+import pandas.io.formats.excel
 
 
 def 閏年判斷():
@@ -63,19 +64,14 @@ def 日期抓取():
 
 def 抓取目標項目(data, 抓取日期):
     目標項目 = set()
-    足標記數 = 0
-    for i in data['OUTPUT']:
+    for index, value in enumerate(data['OUTPUT']):
         for 日期 in 抓取日期:
-            if 日期 in i:
-                目標項目.add(足標記數)
-        足標記數 += 1
-    足標記數 = 0
-
-    for i in data['DIP首件產出時間/數量']:
+            if 日期 in value:
+                目標項目.add(index)
+    for index, value in enumerate(data['DIP首件產出時間/數量']):
         for 日期 in 抓取日期:
-            if 日期 in i:
-                目標項目.add(足標記數)
-        足標記數 += 1
+            if 日期 in value:
+                目標項目.add(index)
     return 目標項目
 
 
@@ -85,46 +81,15 @@ def 文件讀取():
     # 避免自動出不想要的結果 (目前不用這麼做了，先刪掉)
     data = pd.read_excel(f'C:/Users/m3x06/PycharmProjects/公司文件處理/公司Output文件/{file_name}'
                          , header=1, sheet_name=['DIP', 'SMT'])
-    return data
+    data_DIP = data['DIP']
+    data_SMT = data['SMT']
 
-
-def 目標選擇():
-    print('參考選項\n0. DIP\n1. SMT\n2. DIP+SMT')
-    選項 = input('輸入選項')
-    print(f'選擇{選項}')
-    return 選項
-
-
-def 處理選定目標與輸出文件(data):
-    global 選項
-    選項 = int(目標選擇())
-    if 選項 == 0:
-        data = 文件處理(data['DIP'])
-        目標項目 = 抓取目標項目(data, 抓取日期)
-        目標項目文件輸出(data, 目標項目)
-    elif 選項 == 1:
-        data = 文件處理(data['SMT'])
-        目標項目 = 抓取目標項目(data, 抓取日期)
-        目標項目文件輸出(data, 目標項目)
-    elif 選項 == 2:
-        # 這裡的想法是選3的話，就是把選項1和2各個跑一遍
-        # 所以將選項重置為0，並隨著迴圈變成1和2
-        選項 = 0
-        所有工作表 = [data['DIP'], data['SMT']]
-        for 工作表 in 所有工作表:
-            print(f'執行選項{選項}，準備文件處理')
-            data = 文件處理(所有工作表[選項])
-            print('準備抓取目標項目..')
-            目標項目 = 抓取目標項目(data, 抓取日期)
-            print('準備輸出文件...')
-            目標項目文件輸出(data, 目標項目)
-            print('輸出成功')
-            選項 += 1
+    return data_DIP, data_SMT
 
 
 def 文件處理(data):
     # 只留批號1
-    data = data[data['批號'] == 1]
+    # data = data[data['批號'] == 1]
 
     # 丟掉AP和AQ皆為空值的列
     # 先丟AP為空
@@ -139,22 +104,247 @@ def 文件處理(data):
     return data
 
 
-def 目標項目文件輸出(data, 目標項目):
-    if 選項 == 0:
-        輸出工作表 = '輸出結果-DIP.xls'
-    elif 選項 == 1:
-        輸出工作表 = '輸出結果-SMT.xls'
-    data = data.query(f'index == {list(目標項目)}')
-    data.to_excel(f'{輸出工作表}', index=False)
+def 目標項目與資料比對(data, 目標項目):
+    if type(data) is list:
+        for index, value in enumerate(data):
+            if index == 0:
+                data_DIP = value.query(f'index == {list(目標項目[index])}')
+            else:
+                data_SMT = value.query(f'index == {list(目標項目[index])}')
+                # data_SMT.to_excel('輸出結果-SMT.xls', index=False)
+    else:
+        data = data.query(f'index == {list(目標項目)}')
+        data.to_excel('輸出結果.xls', index=False)
 
-    # if 選項 == 0:
-    #     輸出檔名 = '輸出結果-DIP.xls'
-    # elif 選項 == 1:
-    #     輸出檔名 = '輸出結果-SMT.xls'
-    # data = data.query(f'index == {list(目標項目)}')
-    # data.to_excel(f'{輸出檔名}', index=False, sheet_name='DIP')
+    return data_DIP, data_SMT
 
 
-data = 文件讀取()
-日期抓取()
-處理選定目標與輸出文件(data)
+def 抓取Output足標(data, 抓取日期):
+    目標項目 = set()
+    for 足標, value in enumerate(data['OUTPUT']):
+        if 抓取日期 in value:
+            目標項目.add(足標)
+    return 目標項目
+
+
+def 抓取DIP首件足標(data, 抓取日期):
+    目標項目 = set()
+    for 足標, value in enumerate(data['DIP首件產出時間/數量']):
+        if 抓取日期 in value:
+            目標項目.add(足標)
+    return 目標項目
+
+
+def 排序資料(data):
+    # 將'TEST'和'成品'皆為X的部分排序到最前面
+    重置足標 = []
+    for index, row in data.iterrows():
+        if row['TEST'] == 'X' and row['成品'] == 'X':
+            重置足標.insert(0, index)
+        else:
+            重置足標.append(index)
+
+    data = data.reindex(重置足標)
+
+    return data
+
+
+def 格式更改(抓取日期, data):
+    # 创建一个 ExcelWriter 对象，并将数据框写入 Excel 文件
+    # 改變日期讀取有2種寫法
+    # datetime_format='mm/dd yyyy
+    # date_format='mmmm dd yyyy'
+    # 使用上取決於資料本身的狀況，如果資料包含時間 則用datetime_format
+    # 如果只有年月日則使用date_format
+
+    # 獲取當天日期，並將其轉換成文字
+    # 當天日期_文字格式 = 當天日期_日期格式.strftime('%#m/%#d')
+    當天日期_日期格式 = datetime.date.today()
+    當天日期_文字格式 = 當天日期_日期格式.strftime('%m%d')
+    輸出檔名 = 'Output輸出檔' + 當天日期_文字格式 + '.xlsx'
+    writer = pd.ExcelWriter(f'{輸出檔名}', engine='xlsxwriter', datetime_format='mm/dd hh:mm')
+
+    # 一些設定
+    列寬_10 = [0, 1, 9]
+    列寬_5 = [43, 44, 46]
+    隱藏行 = ['D', 'F', 'H', 'I', 'L', 'O', 'Q', 'R', 'S',
+           'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'AA', 'AB',
+           'AC', 'AD', 'AE', 'AF', 'AG', 'AH', 'AI', 'AJ',
+           'AM', 'AN', 'AO']
+
+    # 設置底色
+    # 假日用-淺藍 #b7dee8 、 當日用-淺綠 #92d050 、 明天用-黃色 #ffff00
+    # 此部分注意!!! 原本僅用底色格式時，會造成換行格式消失，也就是單元格內若有多行資料就會全部變成一行
+    # 因此加入'text_wrap': True處理
+    # 經過ChatGPT說明，會有此現象是因為，套用格式時導致換行字元\n被忽略
+    # 加入'text_wrap': True確實是一個解法
+    淺綠格式 = writer.book.add_format({'bg_color': '#92d050', 'valign': 'vcenter', 'font_size': 10, 'text_wrap': True})
+    淺藍格式 = writer.book.add_format({'bg_color': '#b7dee8', 'valign': 'vcenter', 'font_size': 10, 'text_wrap': True})
+    黃色格式 = writer.book.add_format({'bg_color': '#ffff00', 'valign': 'vcenter', 'font_size': 10, 'text_wrap': True})
+
+    # 若要設置標題格式，則需要先用下方程式碼消除標題單元格格式
+    pandas.io.formats.excel.ExcelFormatter.header_style = None
+    # 設置格式
+    # 字體 'font-family': 'Times New Roman'
+    # 大小 'font-size': '12pt'
+    # 'text-align': 'center'
+    # 'vertical-align': 'middle'
+
+    # 將DataFrame寫入Excel
+    工作表名稱 = ['DIP', 'SMT']
+
+    for index, 工作表 in enumerate(data):
+        # 因為標題行不算，所以要加1
+        總筆數 = len(工作表.index) + 1
+
+        工作表.to_excel(writer, index=False, sheet_name=工作表名稱[index])
+
+        # 獲取工作表
+        worksheet = writer.sheets[工作表名稱[index]]
+        # 用for迴圈跑過所有Output
+        # data.iloc[行數-1, 42] 貌似會直接跳過標題行，從內容的第一格開始，並且足標為0
+        # 這邊所抓的足標是從內容的第一行開始，並且足標為0，所以不需要像前面-1，而是一開始的行設定要+1
+
+        # 就目前的邏輯來看，最後一個日期依定會是要填入黃色的日期，故使用list的pop()函數
+        黃底日期 = 抓取日期[len(抓取日期) - 1]
+        足標串列_黃底 = 抓取Output足標(工作表, 黃底日期)
+        for 足標 in 足標串列_黃底:
+            worksheet.write(足標 + 1, 42, 工作表.iloc[足標, 42], 黃色格式)
+        足標串列_黃底 = 抓取DIP首件足標(工作表, 黃底日期)
+        for 足標 in 足標串列_黃底:
+            worksheet.write(足標 + 1, 41, 工作表.iloc[足標, 41], 黃色格式)
+
+        for index, value in enumerate(抓取日期):
+            if value == '6/2':
+                足標串列_綠底 = 抓取Output足標(工作表, value)
+                for 足標 in 足標串列_綠底:
+                    worksheet.write(足標 + 1, 42, 工作表.iloc[足標, 42], 淺綠格式)
+                足標串列_綠底 = 抓取DIP首件足標(工作表, value)
+                for 足標 in 足標串列_綠底:
+                    worksheet.write(足標 + 1, 41, 工作表.iloc[足標, 41], 淺綠格式)
+
+        for 剩餘日期 in 抓取日期:
+            # '6/2' 到正式版要修改成當天日期_文字格式
+            if 剩餘日期 != 黃底日期 and 剩餘日期 != '6/2':
+                足標串列_藍底 = 抓取Output足標(工作表, 剩餘日期)
+                for 足標 in 足標串列_藍底:
+                    worksheet.write(足標 + 1, 42, 工作表.iloc[足標, 42], 淺藍格式)
+                足標串列_藍底 = 抓取DIP首件足標(工作表, 剩餘日期)
+                for 足標 in 足標串列_藍底:
+                    worksheet.write(足標 + 1, 41, 工作表.iloc[足標, 41], 淺藍格式)
+
+        # 必須注意，這裡的data當初是放串列進來，所以讀取也會是串列
+        # 根據不同日期，設置類別1~3，以便排序，
+        # 其中，由於不同類別可能有重複，所以黃底最先標，綠底最後標
+        # (這部分需有實際操作才會比較了解)
+        # for index, value in enumerate(data):
+        #     if index in 足標串列_黃底:
+        #         data.at[index, '類別'] = 3
+        #     elif index in 足標串列_藍底:
+        #         data.at[index, '類別'] = 2
+        #     elif index in 足標串列_綠底:
+        #         data.at[index, '類別'] = 1
+        # data = data.sort_values(by=['類別'])
+
+        # .set_column(0, 0, 10) 用來設置列寬，3個參數分別為，起始列、結束列和列寬
+        for 列 in 列寬_10:
+            worksheet.set_column(列, 列, 12)
+        for 列 in 列寬_5:
+            worksheet.set_column(列, 列, 5)
+        # DIP首件設置16
+        worksheet.set_column(41, 41, 16)
+        # Output設置30
+        worksheet.set_column(42, 42, 30)
+        # 生管備註設置9 因為日期問題 暫時設置
+        worksheet.set_column(45, 45, 10)
+        # 批號
+        worksheet.set_column(2, 2, 2)
+        # 出足數
+        worksheet.set_column(15, 15, 2)
+        # 工令量、排產量
+        worksheet.set_column(10, 10, 4)
+        worksheet.set_column(12, 12, 4)
+
+        # 開始時間、結束時間
+        worksheet.set_column(36, 36, 10)
+        worksheet.set_column(37, 37, 10)
+
+        # 名稱規格
+        worksheet.set_column(4, 4, 25)
+
+        # 隱藏設置
+        for 隱藏 in 隱藏行:
+            worksheet.set_column(f'{隱藏}:{隱藏}', None, None, {'hidden': True})
+
+        標題行格式 = writer.book.add_format({'align': 'center',
+                                        'font_size': 10,
+                                        'valign': 'vcenter',
+                                        'text_wrap': True})
+
+        一般行格式 = writer.book.add_format({
+            'font_size': 10,
+            'valign': 'vcenter',
+            'text_wrap': True})
+
+        for 行數 in range(總筆數):
+            if 行數 != 0:
+                worksheet.set_row(行數, 40, 一般行格式)
+            else:
+                worksheet.set_row(行數, 56, 標題行格式)
+
+    writer.save()
+
+
+def 日期格式與排序的類別標示(抓取日期, data):
+    # 將不同日期標為不同類別，以便後續排序和更改指定格式
+    data['類別'] = None
+    黃底日期 = 抓取日期[len(抓取日期) - 1]
+    黃底日期足標 = 抓取Output足標(data, 黃底日期) | 抓取DIP首件足標(data, 黃底日期)
+    抓取日期.remove(黃底日期)
+    # 正式寫法 如下
+    # 當天日期_日期格式 = datetime.date.today()
+    # 當天日期_文字格式 = 當天日期_日期格式.strftime('%m%d')
+    當天日期 = '6/2'
+    當天日期足標 = 抓取Output足標(data, 當天日期) | 抓取DIP首件足標(data, 當天日期)
+    抓取日期.remove(當天日期)
+
+    for i in range(len(抓取日期)):
+        if i == 0:
+            print(抓取日期[i])
+            剩餘日期足標 = 抓取Output足標(data, 抓取日期[i]) | 抓取DIP首件足標(data, 抓取日期[i])
+        if i != 0:
+            print(抓取日期[i])
+            剩餘日期足標_待合併 = 抓取Output足標(data, 抓取日期[i]) | 抓取DIP首件足標(data, 抓取日期[i])
+            剩餘日期足標 = 剩餘日期足標 | 剩餘日期足標_待合併
+
+    抓取日期.append(當天日期)
+    抓取日期.append(黃底日期)
+
+
+''' 以下為主流程 '''
+
+# 讀取文件，並分成DIP和SMT
+data_DIP, data_SMT = 文件讀取()
+
+# 分別對文件進行處理，包括刪除不必要的資料和重複值等
+data_DIP = 文件處理(data_DIP)
+data_SMT = 文件處理(data_SMT)
+
+# 讓使用者指定抓取的日期區間
+抓取日期 = 日期抓取()
+
+# 根據使用者指定的日期去抓取文件中的目標足標
+DIP目標項目 = 抓取目標項目(data_DIP, 抓取日期)
+SMT目標項目 = 抓取目標項目(data_SMT, 抓取日期)
+
+# 根據目標項目，抓取處理好的文件內的目標，並輸出Excel(名字是
+# 注意data與目標項目必須兩兩相對，比如給data_DIP，那目標項就必須是DIP目標項目
+data_DIP, data_SMT = 目標項目與資料比對(data=[data_DIP, data_SMT], 目標項目=[DIP目標項目, SMT目標項目])
+# 目標項目文件輸出(data=data_DIP, 目標項目=DIP目標項目)
+
+data_DIP = 排序資料(data_DIP)
+data_SMT = 排序資料(data_SMT)
+
+日期格式與排序的類別標示(抓取日期, data_DIP)
+
+格式更改(抓取日期, data=[data_DIP, data_SMT])
