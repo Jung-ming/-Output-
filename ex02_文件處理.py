@@ -1,3 +1,5 @@
+import pandas
+import pandas as pd
 from ex04_資料處理 import *
 from ex03_日期區間 import 取得日期區間
 import platform
