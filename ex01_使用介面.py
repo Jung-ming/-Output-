@@ -46,7 +46,7 @@ class MainWindow(QMainWindow):
         background_label = QLabel(self)
 
         # 加載背景圖片
-        pixmap = QPixmap('../公司Output文件/背景-1.jpg')
+        pixmap = QPixmap('背景-1.jpg')
 
         # 設置 QLabel 的尺寸和背景圖片
         # self.width() 和 self.height() 分別返回視窗的寬度和高度，這樣可以確保背景圖片的大小與視窗相符
