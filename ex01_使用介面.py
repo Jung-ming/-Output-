@@ -46,7 +46,7 @@ class MainWindow(QMainWindow):
         background_label = QLabel(self)
 
         # 加載背景圖片
-        pixmap = QPixmap('../公司Output文件/背景-1.jpg')
+        pixmap = QPixmap('背景-1.jpg')
 
         # 設置 QLabel 的尺寸和背景圖片
         # self.width() 和 self.height() 分別返回視窗的寬度和高度，這樣可以確保背景圖片的大小與視窗相符
@@ -129,16 +129,26 @@ class DateRangePicker(QtWidgets.QWidget):
         spacer_item = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
         layout.addItem(spacer_item)
 
+        start_date = QtCore.QDate.currentDate()
+
+        if start_date.dayOfWeek() == 1:
+            start_date = start_date.addDays(-2)
+
         # 創建起始日期的 QDateEdit
         # QtWidgets.QDateEdit() 函數內可設置預設日期
-        self.start_date_edit = QtWidgets.QDateEdit(QtCore.QDate.currentDate())
+        self.start_date_edit = QtWidgets.QDateEdit(start_date)
         self.start_date_edit.setCalendarPopup(True)
         self.start_date_edit.setFixedWidth(110)
         self.start_date_edit.setStyleSheet("font-size: 18px;font-Family: Times New Roman")
         layout.addWidget(self.start_date_edit)
 
-        # 計算預設的結束日期（當天日期 + 6天）
+        # 計算預設的結束日期（當天日期 + 1天）
         default_end_date = QtCore.QDate.currentDate().addDays(1)
+
+        if default_end_date.dayOfWeek() == 6:
+            default_end_date = default_end_date.addDays(2)
+        elif default_end_date.dayOfWeek() == 7:
+            default_end_date = default_end_date.addDays(1)
 
         # 創建結束日期的 QDateEdit
         self.end_date_edit = QtWidgets.QDateEdit(default_end_date)

@@ -1,0 +1,81 @@
+1. 方法改善
+
+這個步驟比較不好，如果把不想要的列拿掉，就不方便直接把抓出來的資料直接複製到
+做好的檔案裡面，並複製裡面的格式
+具體原因在於，隱藏的列被刪掉，這樣實際上複製進去的時候，沒有那麼多列，就沒辦法像原本那樣
+反而會導致一些不想被隱藏的列也被隱藏
+
+拿掉不想要的列
+data2 = data.drop(['組件件號', 'PCB件號', '版階分配明細', '客戶/PO',
+                   '未完成量', '專案', '出足數', '提前產出通知', '自購齊料',
+                   '線別', '工序', '線別+工序',
+                   '標準工時(分)', '準備時間(H)', '工時小計(H)', '中午前置時間(H)', '下午前置時間(H)',
+                   '異常工時(H)', '总耗時(H)', '前製程\n開始時間', '前製程\n结束時間',
+                   '生管\n排序', 'QC\n機台', '生產註記',
+                   '齊料日(Text)', '驗貨日', '出貨日(Text)', '需打棧板', '備註資訊', '組合工單', '開始日期',
+                   '開始時間.1', '結束日期', '結束時間.1', '前程制開始日期', '前程制開始時間', '前程制結束日期', '前程制結束時間',
+                   '業務', 'Unnamed: 62', '頁簽', '後制程工單號', '批次', '客戶件號', '客供齊料否', 'E.T.A.日期', '預定開工日',
+                   '預定完工日'], axis=1)
+
+改善方式:將此步驟刪除
+
+2. 程式報錯
+
+data = open(f'C:\Users\m3x06\PycharmProjects\爬蟲專案\公司Output文件/{file_name}')
+
+SyntaxError: (unicode error) 'unicodeescape' codec can't decode
+bytes in position 0-5: truncated \UXXXXXXXX escape
+
+將「\」改成「/」即可，「\」在程式碼裡面是跳脫字元，會將後面的部分認定為符號，如下範例:
+print('It\'s a nice day.')- 將'認成符號，避免報錯
+
+改正結果:
+data = open(f'C:/Users/m3x06/PycharmProjects/爬蟲專案/公司Output文件/{file_name}')
+
+
+3. 程式報錯
+
+data = open(f'C:/Users/m3x06/PycharmProjects/爬蟲專案/公司Output文件/{file_name}')
+
+'cp950' codec can't decode byte 0xb1 in position 5: illegal multibyte sequence
+
+
+4. 程式報錯
+
+KeyError: 'SMT'
+(這裡的讀出來的Data是字典，因為一次讀了兩個工作表)
+以下的for迴圈是希望跑2次，分別處理DIP檔案和SMT檔案，但是跑到第二次的時候就會報錯，說是沒有SMT這個鍵，檢查後發現，
+處理完第一次之後，data就變成處理後的文件(DataFrame)，不再是字典，所以自然也讀不到SMT這個鍵
+
+    elif 選項 == 3:
+        # 這裡的想法是選3的話，就是把選項1和2各個跑一遍
+        # 所以將選項重置為0，並隨著迴圈變成1和2
+        選項 = 0
+        所有工作表 = ['DIP', 'SMT']
+        for 工作表 in 所有工作表:
+            print(data)
+            選項 += 1
+            print(f'執行選項{選項}，準備文件處理')
+            data = 文件處理(data[工作表])
+            print('準備抓取目標項目..')
+            目標項目 = 抓取目標項目(data, 抓取日期)
+            print('準備輸出文件...')
+            目標項目文件輸出(data, 目標項目)
+            print('輸出成功')
+
+
+5. 結果不如預期
+
+下面的寫法會導致每輸出一次Excel就存一次，因此沒辦法同時將2個不同資料，存在一樣的Excel裡面
+只能同時輸出兩個Excel再存，才能
+
+
+def 目標項目文件輸出(data, 目標項目):
+    writer = pd.ExcelWriter('output.xlsx', engine='xlsxwriter')
+    if 選項 == 0:
+        輸出工作表 = 'Sheet1'
+    elif 選項 == 1:
+        輸出工作表 = 'Sheet2'
+    data = data.query(f'index == {list(目標項目)}')
+    data.to_excel(writer, index=False, sheet_name=輸出工作表)
+    writer.save()
