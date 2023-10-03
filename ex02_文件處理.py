@@ -88,7 +88,7 @@ def 格式更改(抓取日期, data):
     日期格式_置中 = writer.book.add_format({'align': 'center', 'valign': 'vcenter', 'font_size': 10})
     日期格式_靠左 = writer.book.add_format({'valign': 'vcenter', 'font_size': 10})
     # 若要設置標題格式，則需要先用下方程式碼消除標題單元格格式
-    pandas.io.formats.excel.ExcelFormatter.header_style = None
+    # pandas.io.formats.excel.ExcelFormatter.header_style = None
     # 設置格式
     # 字體 'font-family': 'Times New Roman'
     # 大小 'font-size': '12pt'
@@ -173,8 +173,9 @@ def 格式更改(抓取日期, data):
         for 行數 in range(總筆數):
             if 行數 != 0:
                 worksheet.set_row(行數, 40, 一般行格式)
-            else:
-                worksheet.set_row(行數, 56, 標題行格式)
+
+        for columnnum, columnname in enumerate(list(工作表.columns)):
+            worksheet.write(0, columnnum, columnname, 標題行格式)
         # for 行數 in range(總筆數 - 1):
         #     # 就目前經驗來講，操作上最好都讓總筆數=內容行數，不包含標題行，這樣便能直接按照如下邏輯撰寫
         #     # 這裡的標題行-1 變為101，也就是內容的總筆數
